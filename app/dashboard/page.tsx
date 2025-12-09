@@ -205,7 +205,7 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button 
-                            onClick={() => router.push('/catalog')}
+                            onClick={() => window.open('/rfp_sources.html', '_blank')}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                           >
                             Review

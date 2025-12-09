@@ -1,36 +1,16 @@
 import { NextResponse } from 'next/server';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import * as cheerio from 'cheerio';
+import rfpData from '@/public/rfp_data.json';
 
 export async function GET() {
   try {
-    const filePath = join(process.cwd(), 'public', 'rfp_sources.html');
-    const html = readFileSync(filePath, 'utf-8');
-    const $ = cheerio.load(html);
-    
-    // Extract JSON data
-    const jsonScript = $('#rfp-json').html();
-    if (!jsonScript) {
-      return NextResponse.json({ error: 'No JSON data found' }, { status: 404 });
-    }
-    
-    const rfpData = JSON.parse(jsonScript);
     const today = new Date();
-    
     const rfps: any[] = [];
     
-    // Process each RFP
+    // Process each RFP from static JSON data
     Object.keys(rfpData).forEach((id) => {
-      const data = rfpData[id];
+      const data = rfpData[id as keyof typeof rfpData];
       const offset = data.due_date_offset_days || 0;
       const dueDate = new Date(today.getTime() + offset * 24 * 60 * 60 * 1000);
-      
-      // Get additional metadata from HTML
-      const card = $(`#${id}`);
-      const issuingEntity = card.find('.meta').first().text().replace('Issuing Entity: ', '');
-      const executor = card.find('.meta').eq(1).text().replace('Executor: ', '');
-      const badge = card.find('.badge').text();
       
       rfps.push({
         id,
@@ -40,9 +20,9 @@ export async function GET() {
         scope: data.scope,
         tests: data.tests,
         origin_url: data.origin_url,
-        issuing_entity: issuingEntity,
-        executor: executor,
-        type: badge,
+        issuing_entity: data.issuing_entity,
+        executor: data.executor,
+        type: data.type,
       });
     });
     

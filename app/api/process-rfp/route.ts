@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mainAgent } from '@/lib/langchain-agents';
-import fs from 'fs';
-import path from 'path';
-import * as cheerio from 'cheerio';
+import rfpDataSource from '@/public/rfp_data.json';
 import { type RFP } from '@/lib/rfpParser';
 
 export async function POST(request: Request) {
@@ -21,33 +19,15 @@ export async function POST(request: Request) {
       }, { status: 503 });
     }
 
-    // Get RFP data from filesystem (same logic as /api/rfps)
-    const htmlPath = path.join(process.cwd(), 'public', 'rfp_sources.html');
-    const htmlContent = fs.readFileSync(htmlPath, 'utf-8');
-    const $ = cheerio.load(htmlContent);
-    
-    // Extract JSON data
-    const jsonScript = $('#rfp-json').html();
-    if (!jsonScript) {
-      return NextResponse.json({ error: 'No JSON data found in RFP source' }, { status: 404 });
-    }
-    
-    const rfpData = JSON.parse(jsonScript);
+    // Get RFP data from static JSON
     const today = new Date();
-    
     const rfps: RFP[] = [];
     
-    // Process each RFP
-    Object.keys(rfpData).forEach((id) => {
-      const data = rfpData[id];
+    // Process each RFP from static JSON data
+    Object.keys(rfpDataSource).forEach((id) => {
+      const data = rfpDataSource[id as keyof typeof rfpDataSource];
       const offset = data.due_date_offset_days || 0;
       const dueDate = new Date(today.getTime() + offset * 24 * 60 * 60 * 1000);
-      
-      // Get additional metadata from HTML
-      const card = $(`#${id}`);
-      const issuingEntity = card.find('.meta').first().text().replace('Issuing Entity: ', '');
-      const executor = card.find('.meta').eq(1).text().replace('Executor: ', '');
-      const badge = card.find('.badge').text();
       
       rfps.push({
         id,
@@ -57,9 +37,9 @@ export async function POST(request: Request) {
         scope: data.scope,
         tests: data.tests,
         origin_url: data.origin_url,
-        issuing_entity: issuingEntity,
-        executor: executor,
-        type: badge,
+        issuing_entity: data.issuing_entity,
+        executor: data.executor,
+        type: data.type,
       });
     });
     
