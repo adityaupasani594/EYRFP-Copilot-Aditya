@@ -320,7 +320,9 @@ Provide a JSON response with:
       
       // Step 1: Sales qualification
       console.log('📊 Running Sales Agent...');
+      const salesStart = Date.now();
       const salesResult = await this.salesAgent.qualifyRFP(rfp);
+      const salesDuration = Date.now() - salesStart;
       console.log('✅ Sales Agent complete:', salesResult);
       
       if (!salesResult.qualified) {
@@ -335,20 +337,25 @@ Provide a JSON response with:
           salesResult,
           techResult: null,
           pricingResult: null,
+          timings: { salesMs: salesDuration, techMs: 0, pricingMs: 0, totalMs: salesDuration },
         };
       }
 
       // Step 2: Technical matching
       console.log('🔧 Running Tech Agent...');
+      const techStart = Date.now();
       const techResult = await this.techAgent.matchSpecifications(rfp.scope);
+      const techDuration = Date.now() - techStart;
       console.log('✅ Tech Agent complete:', techResult);
 
       // Step 3: Pricing calculation
       console.log('💰 Running Pricing Agent...');
+      const pricingStart = Date.now();
       const pricingResult = await this.pricingAgent.calculatePricing(
         rfp.scope,
         rfp.issuing_entity || 'Unknown'
       );
+      const pricingDuration = Date.now() - pricingStart;
       console.log('✅ Pricing Agent complete:', pricingResult);
 
       // Step 4: Final coordination and decision
@@ -368,6 +375,12 @@ Provide a JSON response with:
         salesResult,
         techResult,
         pricingResult,
+        timings: {
+          salesMs: salesDuration,
+          techMs: techDuration,
+          pricingMs: pricingDuration,
+          totalMs: salesDuration + techDuration + pricingDuration,
+        },
       };
     } catch (error) {
       console.error('Main Agent error:', error);

@@ -16,7 +16,7 @@ export default function DashboardPage() {
     avgMatchAccuracy: number;
     catalogCoverage: number;
     manualOverrides: number;
-    sources: { website: number; email: number };
+    sources: { website: number; email: number; uploaded: number };
     winRates: { month: string; rate: number }[];
     totalItems: number;
   }>({
@@ -24,7 +24,7 @@ export default function DashboardPage() {
     avgMatchAccuracy: 0,
     catalogCoverage: 0,
     manualOverrides: 0,
-    sources: { website: 0, email: 0 },
+    sources: { website: 0, email: 0, uploaded: 0 },
     winRates: [],
     totalItems: 0,
   });

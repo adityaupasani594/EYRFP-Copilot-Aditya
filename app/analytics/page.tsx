@@ -99,6 +99,21 @@ export default function AnalyticsPage() {
                     ></div>
                   </div>
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Uploaded PDF</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {metrics.sources.uploaded} RFPs ({Math.round((metrics.sources.uploaded / metrics.rfpsAwaitingReview) * 100)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-600 h-2 rounded-full"
+                      style={{ width: `${(metrics.sources.uploaded / metrics.rfpsAwaitingReview) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { mainAgent } from '@/lib/langchain-agents';
 import rfpDataSource from '@/public/rfp_data.json';
 import { type RFP } from '@/lib/rfpParser';
+import { getDatabase } from '@/lib/mongodb';
 
 export async function POST(request: Request) {
   try {
@@ -63,6 +64,158 @@ export async function POST(request: Request) {
     console.log(`✅ Processing Complete (${processingTime}ms)`);
     console.log(`Decision: ${result.decision}`);
     console.log(`${'='.repeat(60)}\n`);
+
+    // Persist logs, reports, and processed result
+    try {
+      const db = await getDatabase();
+      const logs = db.collection('agent_logs');
+      const reports = db.collection('agent_reports');
+      const processed = db.collection('processed_rfps');
+
+      // Per-agent logs
+      if (result.salesResult) {
+        await logs.insertOne({
+          timestamp: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Sales',
+          level: 'info',
+          message: 'Sales Agent completed',
+          durationMs: result.timings?.salesMs,
+          data: result.salesResult,
+        });
+      }
+      if (result.techResult) {
+        await logs.insertOne({
+          timestamp: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Tech',
+          level: 'info',
+          message: 'Tech Agent completed',
+          durationMs: result.timings?.techMs,
+          data: result.techResult,
+        });
+      }
+      if (result.pricingResult) {
+        await logs.insertOne({
+          timestamp: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Pricing',
+          level: 'info',
+          message: 'Pricing Agent completed',
+          durationMs: result.timings?.pricingMs,
+          data: result.pricingResult,
+        });
+      }
+
+      // Main agent + collective logs
+      await logs.insertOne({
+        timestamp: new Date(),
+        rfpId,
+        rfpTitle: rfp.title,
+        agent: 'Main',
+        level: 'info',
+        message: `Main Agent decision: ${result.decision}`,
+        durationMs: result.timings?.totalMs ?? processingTime,
+        data: result,
+      });
+      await logs.insertOne({
+        timestamp: new Date(),
+        rfpId,
+        rfpTitle: rfp.title,
+        agent: 'Collective',
+        level: 'info',
+        message: 'Collective processing complete',
+        durationMs: processingTime,
+        data: {
+          decision: result.decision,
+          confidence: result.confidence,
+          timings: result.timings,
+        },
+      });
+
+      // Reports per agent
+      if (result.salesResult) {
+        await reports.insertOne({
+          createdAt: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Sales',
+          summary: `Qualified: ${result.salesResult.qualified ? 'Yes' : 'No'}, Priority: ${result.salesResult.priority}, Win Probability: ${result.salesResult.winProbability}%`,
+          metrics: {
+            winProbability: result.salesResult.winProbability ?? 0,
+          },
+          data: result.salesResult,
+        });
+      }
+      if (result.techResult) {
+        await reports.insertOne({
+          createdAt: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Tech',
+          summary: `Match Confidence: ${result.techResult.matchConfidence}%, Matched: ${result.techResult.matchedItems}/${result.techResult.totalItems}`,
+          metrics: {
+            matchConfidence: result.techResult.matchConfidence ?? 0,
+          },
+          data: result.techResult,
+        });
+      }
+      if (result.pricingResult) {
+        await reports.insertOne({
+          createdAt: new Date(),
+          rfpId,
+          rfpTitle: rfp.title,
+          agent: 'Pricing',
+          summary: `Bid Price: ${result.pricingResult.finalBidPrice?.toLocaleString?.() || result.pricingResult.finalBidPrice}, Margin: ${result.pricingResult.recommendedMargin}%`,
+          metrics: {
+            finalBidPrice: result.pricingResult.finalBidPrice ?? 0,
+            margin: result.pricingResult.recommendedMargin ?? 0,
+          },
+          data: result.pricingResult,
+        });
+      }
+
+      // Collective report
+      await reports.insertOne({
+        createdAt: new Date(),
+        rfpId,
+        rfpTitle: rfp.title,
+        agent: 'Collective',
+        summary: `Decision: ${result.decision.toUpperCase()} with ${result.confidence}% confidence`,
+        metrics: {
+          confidence: result.confidence ?? 0,
+        },
+        data: {
+          decision: result.decision,
+          confidence: result.confidence,
+          sales: result.salesResult,
+          tech: result.techResult,
+          pricing: result.pricingResult,
+        },
+      });
+
+      // Upsert processed results for quick retrieval later
+      await processed.updateOne(
+        { rfpId },
+        {
+          $set: {
+            rfpId,
+            rfpTitle: rfp.title,
+            rfp,
+            result,
+            processedAt: new Date(),
+            processingTime,
+          },
+        },
+        { upsert: true }
+      );
+    } catch (persistErr) {
+      console.error('Failed to persist logs/reports:', persistErr);
+      // continue without failing request
+    }
 
     return NextResponse.json({
       success: true,

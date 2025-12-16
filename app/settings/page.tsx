@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import { allAgents } from '@/lib/agents';
+import Link from 'next/link';
 import { Bot, CheckCircle, Settings as SettingsIcon, Zap, AlertCircle } from 'lucide-react';
 
 export default function SettingsPage() {
   const [agentStatus, setAgentStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<{ name: string; email: string; accountType: 'individual' | 'business' } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
 
   useEffect(() => {
     fetch('/api/process-rfp')
@@ -21,7 +25,62 @@ export default function SettingsPage() {
         console.error('Error fetching agent status:', err);
         setLoading(false);
       });
+
+    // Load current user profile if logged in
+    async function loadProfile() {
+      try {
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+        if (!token && user) {
+          const u = JSON.parse(user);
+          setProfile({ name: u.name, email: u.email, accountType: u.accountType });
+          return;
+        }
+        if (token) {
+          const res = await fetch('/api/user', { headers: { Authorization: `Bearer ${token}` } });
+          const data = await res.json();
+          if (data.success && data.user) {
+            setProfile({ name: data.user.name, email: data.user.email, accountType: data.user.accountType });
+            localStorage.setItem('user', JSON.stringify(data.user));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    loadProfile();
   }, []);
+
+  const handleSave = async () => {
+    if (!profile) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const res = await fetch('/api/user', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(profile),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          setSaveMsg('Saved successfully');
+        } else {
+          setSaveMsg(data.error || 'Save failed');
+        }
+      } else {
+        localStorage.setItem('user', JSON.stringify({ ...profile }));
+        setSaveMsg('Saved locally');
+      }
+    } catch (e) {
+      setSaveMsg('Save failed');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(''), 2500);
+    }
+  };
 
   return (
     <div className="flex">
@@ -104,12 +163,67 @@ export default function SettingsPage() {
                       <Zap size={16} />
                       LangChain Powered
                   </button>
-                  <button className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                  <Link
+                    href={`/logs?agent=${encodeURIComponent(
+                      index === 0 ? 'Sales' : index === 1 ? 'Tech' : index === 2 ? 'Pricing' : 'Main'
+                    )}`}
+                    className="flex-1 text-center border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
                     View Logs
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Profile Settings */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingsIcon size={20} className="text-gray-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Profile Settings</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-600">Name</label>
+                <input
+                  value={profile?.name || ''}
+                  onChange={(e) => setProfile(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900"
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Email</label>
+                <input
+                  type="email"
+                  value={profile?.email || ''}
+                  onChange={(e) => setProfile(prev => prev ? { ...prev, email: e.target.value } : prev)}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900"
+                  placeholder="you@company.com"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Account Type</label>
+                <select
+                  value={profile?.accountType || 'individual'}
+                  onChange={(e) => setProfile(prev => prev ? { ...prev, accountType: e.target.value as any } : prev)}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900"
+                >
+                  <option value="individual">Individual</option>
+                  <option value="business">Business</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              {saveMsg && <span className="text-sm text-gray-600">{saveMsg}</span>}
+            </div>
           </div>
 
           {/* Agent Workflow Diagram */}
