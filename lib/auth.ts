@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { ObjectId } from 'mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export interface User {
-  _id?: string;
+  _id?: ObjectId;
   name: string;
   email: string;
   password: string;
