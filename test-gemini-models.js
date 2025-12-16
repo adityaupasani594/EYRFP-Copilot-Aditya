@@ -1,7 +1,7 @@
 // Test script to list available Gemini models via REST API
 const https = require('https');
 
-const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDk8Sv35lQdabaT6dBHTuotGJBpVGpQ2Ok";
+const apiKey = process.env.GEMINI_API_KEY || "your_api_key_here";
 
 async function listModels() {
   return new Promise((resolve, reject) => {
