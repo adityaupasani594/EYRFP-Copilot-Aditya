@@ -178,6 +178,14 @@ export default function DashboardPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {rfps.map((rfp) => {
                     const matchConfidence = 88 + Math.floor(Math.random() * 10);
+                    const isUploadedPdf = rfp.origin_url?.includes('uploaded-pdf');
+                    const handleReview = () => {
+                      if (isUploadedPdf) {
+                        window.open(`/api/rfps/${encodeURIComponent(rfp.id)}/pdf`, '_blank');
+                      } else {
+                        window.open('/rfp_sources.html', '_blank');
+                      }
+                    };
                     return (
                       <tr key={rfp.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -205,7 +213,7 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button 
-                            onClick={() => window.open('/rfp_sources.html', '_blank')}
+                            onClick={handleReview}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                           >
                             Review

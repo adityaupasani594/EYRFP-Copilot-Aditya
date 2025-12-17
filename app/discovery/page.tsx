@@ -37,6 +37,9 @@ export default function DiscoveryPage() {
 
       const res = await fetch('/api/upload-rfp', { method: 'POST', body: form });
       const data = await res.json();
+      if (data.parser) {
+        console.log(`🤖 Parsed by ${data.parser === 'gemini' ? 'Gemini AI' : 'Heuristic Parser'}`);
+      }
       setUploadResult(data);
     } catch (err) {
       setUploadResult({ success: false, error: 'Upload failed' });
@@ -95,9 +98,6 @@ export default function DiscoveryPage() {
                             JSON
                           </button>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded ${uploadResult.parser === 'gemini' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {uploadResult.parser === 'gemini' ? '🤖 Parsed by Gemini AI' : '⚙️ Heuristic Parser'}
-                        </span>
                       </div>
                     </div>
                     {uploadViewMode === 'json' ? (

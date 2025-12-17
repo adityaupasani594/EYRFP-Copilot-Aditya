@@ -12,6 +12,23 @@ export default function Header() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  
+  // Persisted read state for notifications
+  const getReadIds = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem('readNotificationIds');
+      const arr: string[] = raw ? JSON.parse(raw) : [];
+      return new Set(arr);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const saveReadIds = (ids: Set<string>) => {
+    try {
+      localStorage.setItem('readNotificationIds', JSON.stringify(Array.from(ids)));
+    } catch {}
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -36,8 +53,13 @@ export default function Header() {
     try {
       const response = await fetch('/api/notifications');
       const data = await response.json();
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.unreadCount || 0);
+      const readIds = getReadIds();
+      const list = (data.notifications || []).map((n: any) => ({
+        ...n,
+        unread: !!n.unread && !readIds.has(String(n.id)),
+      }));
+      setNotifications(list);
+      setUnreadCount(list.filter((n: any) => n.unread).length);
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
@@ -52,7 +74,12 @@ export default function Header() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notificationId: notification.id, action: 'markRead' }),
         });
-        loadNotifications();
+        // Update local read state and UI immediately
+        const readIds = getReadIds();
+        readIds.add(String(notification.id));
+        saveReadIds(readIds);
+        setNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, unread: false } : n));
+        setUnreadCount((c) => Math.max(0, c - 1));
       } catch (error) {
         console.error('Failed to mark notification as read:', error);
       }
@@ -72,7 +99,13 @@ export default function Header() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'markAllRead' }),
       });
-      loadNotifications();
+      // Persist all current IDs as read and update UI immediately
+      const ids = new Set<string>(notifications.map((n) => String(n.id)));
+      const readIds = getReadIds();
+      ids.forEach((id) => readIds.add(id));
+      saveReadIds(readIds);
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+      setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all as read:', error);
     }
@@ -81,24 +114,24 @@ export default function Header() {
   return (
     <header className="bg-white border-b border-gray-200 h-16 fixed top-0 right-0 left-48 z-10 flex items-center justify-end px-6">
       {/* Right section only */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 h-full">
         {/* Help/About Button */}
         <button 
           onClick={() => router.push('/about')}
-          className="text-gray-600 hover:text-gray-800 transition-colors"
+          className="text-gray-600 hover:text-gray-800 transition-colors flex items-center"
           title="About"
         >
           <HelpCircle size={20} />
         </button>
 
         {/* Notifications Button */}
-        <div className="relative">
+        <div className="relative flex items-center">
           <button 
             onClick={() => {
               setShowNotifications(!showNotifications);
               setShowUserMenu(false);
             }}
-            className="text-gray-600 hover:text-gray-800 relative transition-colors"
+            className="text-gray-600 hover:text-gray-800 relative transition-colors flex items-center"
             title="Notifications"
           >
             <Bell size={20} />
@@ -111,7 +144,7 @@ export default function Header() {
 
           {/* Notifications Dropdown */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+            <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">Notifications</h3>
                 <div className="flex items-center gap-2">
@@ -131,7 +164,7 @@ export default function Header() {
                   </button>
                 </div>
               </div>
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-[70vh] overflow-y-auto">
                 {notifications.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 text-sm">
                     No notifications yet
@@ -173,13 +206,13 @@ export default function Header() {
         </div>
 
         {/* User Menu Button */}
-        <div className="relative">
+        <div className="relative flex items-center">
           <button 
             onClick={() => {
               setShowUserMenu(!showUserMenu);
               setShowNotifications(false);
             }}
-            className="text-gray-600 hover:text-gray-800 transition-colors"
+            className="text-gray-600 hover:text-gray-800 transition-colors flex items-center"
             title="User Menu"
           >
             <User size={20} />
@@ -187,17 +220,20 @@ export default function Header() {
 
           {/* User Menu Dropdown */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
               <div className="p-4 border-b border-gray-200">
                 <p className="font-semibold text-gray-900">{userName}</p>
                 <p className="text-xs text-gray-500 mt-1">Welcome back!</p>
               </div>
               <div className="p-2">
-                <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
-                  Profile Settings
-                </button>
-                <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
-                  Account Preferences
+                <button 
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    router.push('/settings');
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  Settings
                 </button>
                 <button 
                   onClick={() => {

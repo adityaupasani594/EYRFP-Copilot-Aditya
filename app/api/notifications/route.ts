@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     // Return default notifications if DB fails
     return NextResponse.json({
       notifications: [
-        { id: 1, title: 'Welcome to EY RFP Copilot', message: 'Your AI-powered RFP management system is ready', time: 'Just now', unread: true, type: 'system', link: '/dashboard' },
+        { id: 1, title: 'Welcome to EY RFP Copilot', message: 'Your AI powered RFP management system is ready', time: 'Just now', unread: true, type: 'system', link: '/dashboard' },
       ],
       unreadCount: 1,
     });

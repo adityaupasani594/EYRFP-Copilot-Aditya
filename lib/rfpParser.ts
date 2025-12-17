@@ -57,9 +57,9 @@ export async function parseWithGemini(text: string): Promise<{ rfp: RFP | null; 
     });
 
     const prompt = ChatPromptTemplate.fromMessages([
-      ['system', `You are an expert at extracting structured information from RFP (Request for Proposal) documents.
+      ['system', `You are an expert at extracting structured information from Paints/Coatings RFP (Request for Proposal) documents for Asian Paints.
 
-Your task: Analyze the document and extract ALL items, products, materials, or services mentioned.
+Your task: Analyze the document and extract ALL painting/coating related items, materials, or services mentioned.
 
 Extraction Rules:
 1. Find the RFP title/subject (usually at the top)
@@ -69,25 +69,30 @@ Extraction Rules:
    - Numbered lists (1., 2., 3.)
    - Bullet points (•, -, *)
    - Tables with item descriptions
-   - Any lines mentioning products/materials/services
-   - Quantities (look for numbers followed by units like pcs, units, kg, meters, etc.)
+   - Any lines mentioning paints, coatings, primers, putty, surface preparation, scaffolding
+   - Quantities with units (m², liters, kg, running meters, etc.)
 
-5. For technical specifications:
-   - Cables/Wires: extract conductor size (mm²), voltage (kV), insulation thickness (mm)
-   - Other items: use default specs (conductor_size_mm2: 4, voltage_kv: 1, insulation_mm: 1.0)
+5. For technical specifications (Paints/Coatings focus):
+   - Extract: coverage_area_m2, surface_type (interior/exterior/metal/wood/concrete), number_of_coats, paint_type/system (emulsion/enamel/epoxy/polyurethane), finish (matte/gloss/satin), color/shade if present, primer_required (yes/no), surface_prep (eg. rust removal, sanding, putty), VOC/low_odor requirements, warranty_years if present.
+   - If thickness is specified, extract dry_film_thickness_microns.
 
-6. Look for test requirements or quality standards
+Schema compatibility mapping (important): in addition to the above keys, also include these numeric placeholders under specs for compatibility with downstream code:
+   - conductor_size_mm2: map to coverage_area_m2 (or a reasonable numeric value)
+   - voltage_kv: map to number_of_coats
+   - insulation_mm: map to dry_film_thickness_microns divided by 1000 (mm). If not given, use 0.1
 
-CRITICAL: Use actual text from the document - NO generic placeholders like "Item 1", "Product X", etc.
+6. Look for test requirements or quality standards (eg. IS/ISO standards, adhesion tests, salt spray for metal, washability)
+
+CRITICAL: Use actual text from the document - NO generic placeholders like "Item 1" or "Product X".
 
 Return ONLY valid JSON without markdown code blocks.`],
-      ['human', `Analyze this RFP document and extract all information:
+      ['human', `Analyze this paints/coatings RFP document and extract all information:
 
 {rfpText}
 
 ---
 
-Return this JSON structure:
+Return this JSON structure (keep specs mapping as instructed above):
 {{
   "id": "RFP-UPLOAD-${Date.now()}",
   "title": "<actual RFP title from document>",
@@ -96,16 +101,23 @@ Return this JSON structure:
   "scope": [
     {{
       "item_id": 1,
-      "description": "<ACTUAL item description - be specific>",
+      "description": "<ACTUAL paints/coatings item description - include surface and area>",
       "qty": <number>,
       "specs": {{
-        "conductor_size_mm2": 4,
-        "voltage_kv": 1,
-        "insulation_mm": 1.0
+        "coverage_area_m2": <number>,
+        "surface_type": "<concrete/metal/wood/interior/exterior>",
+        "number_of_coats": <number>,
+        "paint_type": "<emulsion/enamel/epoxy/...>",
+        "finish": "<matte/gloss/satin>",
+        "primer_required": <true|false>,
+        "dry_film_thickness_microns": <number>,
+        "conductor_size_mm2": <number>,
+        "voltage_kv": <number>,
+        "insulation_mm": <number>
       }}
     }}
   ],
-  "tests": [],
+  "tests": ["<eg. IS/ISO test requirements if any>"],
   "origin_url": "uploaded-pdf",
   "issuing_entity": "<organization name from document>",
   "type": "PDF"
@@ -211,6 +223,15 @@ Extract AT LEAST 1 item. If the document has multiple items, include them all.`]
 }
 
 export function calculateMetrics(rfps: RFP[]) {
+  const defaultWinRates = [
+    { month: 'Jul', rate: 58 },
+    { month: 'Aug', rate: 62 },
+    { month: 'Sep', rate: 65 },
+    { month: 'Oct', rate: 64 },
+    { month: 'Nov', rate: 67 },
+    { month: 'Dec', rate: 68 },
+  ];
+
   if (!rfps.length) {
     return {
       rfpsAwaitingReview: 0,
@@ -218,7 +239,7 @@ export function calculateMetrics(rfps: RFP[]) {
       catalogCoverage: 0,
       manualOverrides: 0,
       sources: { website: 0, email: 0, uploaded: 0 },
-      winRates: [],
+      winRates: defaultWinRates,
       totalItems: 0,
     };
   }
@@ -278,14 +299,7 @@ export function calculateMetrics(rfps: RFP[]) {
   };
 
   // Win rate (simulated based on RFP complexity)
-  const winRates = [
-    { month: 'Jul', rate: 58 },
-    { month: 'Aug', rate: 62 },
-    { month: 'Sep', rate: 65 },
-    { month: 'Oct', rate: 64 },
-    { month: 'Nov', rate: 67 },
-    { month: 'Dec', rate: 68 },
-  ];
+  const winRates = defaultWinRates;
 
   return {
     rfpsAwaitingReview: totalRFPs,

@@ -9,7 +9,9 @@ import {
   BarChart3, 
   Settings,
   Zap,
-  Info
+  Info,
+  Activity,
+  FileText
 } from 'lucide-react';
 
 const navItems = [
@@ -17,9 +19,8 @@ const navItems = [
   { name: 'Discovery', icon: Search, path: '/discovery' },
   { name: 'Catalog', icon: BookOpen, path: '/catalog' },
   { name: 'Analytics', icon: BarChart3, path: '/analytics' },
-  { name: 'Logs', icon: BarChart3, path: '/logs' },
-  { name: 'Reports', icon: BarChart3, path: '/reports' },
-  { name: 'Test Agents', icon: Zap, path: '/test-agents' },
+  { name: 'Logs', icon: Activity, path: '/logs' },
+  { name: 'Reports', icon: FileText, path: '/reports' },
   { name: 'Settings', icon: Settings, path: '/settings' },
   { name: 'About', icon: Info, path: '/about' },
 ];
